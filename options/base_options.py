@@ -55,18 +55,10 @@ class BaseOptions():
 
         str_ids = self.opt.gpu_ids.split(',')
         self.opt.gpu_ids = []
-        self.opt.semantic_nc = self.opt.label_nc + \
-                          (0 if self.opt.no_contain_dontcare_label else 1)
         for str_id in str_ids:
             id = int(str_id)
             if id >= 0:
                 self.opt.gpu_ids.append(id)
-        self.opt.classes_of_interest_ids = []
-        if self.opt.use_bbox is not False:
-            for str_class_id in self.opt.classes_of_interest.split(','):
-                id = int(str_class_id)
-                if id >= 0:
-                    self.opt.classes_of_interest_ids.append(id)
 
         # set gpu ids
         if len(self.opt.gpu_ids) > 0:

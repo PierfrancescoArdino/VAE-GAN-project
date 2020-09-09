@@ -17,7 +17,7 @@ class Visualizer():
         self.use_html = opt.isTrain and not opt.no_html
         self.win_size = opt.display_winsize
         self.name = opt.name
-        self.base_folder = "SPG-NET" if any(x in self.name for x in ["SG-NET", "SP-NET", "SPG-NET"]) else "SLG-NET"
+        self.base_folder = "DPFIP"
 
         if self.tf_log:
             import tensorflow as tf
