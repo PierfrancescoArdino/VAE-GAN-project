@@ -288,7 +288,7 @@ class VaeGanModule(BaseModel):
                self.discriminator.forward(input_concat_real)
 
     def forward(self, images):
-        x, _ = images
+        x = images
         self.last_imgs = x
 
         mu, log_var = self.encoder(x)
