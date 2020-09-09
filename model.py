@@ -319,7 +319,7 @@ class VaeGanModule(BaseModel):
 
         # reconstruction
         reconstruction_loss = self.criterionFeat(fake_image, x)
-        kld_loss = -0.5 * torch.sum(1 + log_var - mu.pow(2) - log_var.exp())
+        kld_loss = - 0.5 * torch.mean(1 + log_var - mu.pow(2) - log_var.exp())
         input_concat_fake = \
             torch.cat((fake_image, x), dim=1)
         pred_fake = self.discriminator.forward(input_concat_fake)
