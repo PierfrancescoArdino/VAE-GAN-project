@@ -287,7 +287,7 @@ class VaeGanModule(BaseModel):
     def reparameterize(self, mu, logvar, mode):
         if mode == 'train':
             std = torch.exp(0.5 * logvar)
-            eps = Variable(std.data.new(std.size()).normal_())
+            eps = torch.randn_like(std)
             return mu + eps * std
         else:
             return mu
