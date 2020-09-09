@@ -28,8 +28,7 @@ class Visualizer():
         if self.use_html:
             self.web_dir = os.path.join(opt.checkpoints_dir, self.base_folder, opt.name, 'web')
             self.img_dir = os.path.join(self.web_dir, 'images')
-            if opt.local_rank == 0:
-                print('create web directory %s...' % self.web_dir)
+            print('create web directory %s...' % self.web_dir)
             util.mkdirs([self.web_dir, self.img_dir])
         if opt.isTrain:
             self.log_name = os.path.join(opt.checkpoints_dir, self.base_folder, opt.name, 'loss_log.txt')
