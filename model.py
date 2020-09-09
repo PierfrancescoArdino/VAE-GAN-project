@@ -8,6 +8,7 @@ from collections import OrderedDict
 import torchvision
 from torchsummary import summary
 from base_model import BaseModel
+import os
 
 def weights_init(m):
     classname = m.__class__.__name__
@@ -267,6 +268,7 @@ class VaeGanModule(BaseModel):
         self.criterionFeat = torch.nn.L1Loss()
         self.criterionGAN = losses.GANLoss(gan_mode="lsgan")
         self.last_imgs = None
+        self.save_dir = os.path.join(opt.checkpoints_dir, "DPFIP", opt.name)
         self.loss_filter = self.init_loss_filter()
         params = list(self.encoder.parameters()) + \
                                   list(self.decoder.parameters())
