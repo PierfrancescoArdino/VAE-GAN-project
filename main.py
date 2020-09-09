@@ -130,14 +130,11 @@ def train(gpu, opt):
                 # call(["nvidia-smi", "--format=csv", "--query-gpu=memory.used,memory.free"])
 
             ### display output images
-            if len(opt.gpu_ids) > 1 and opt.local_rank != 0:
-                save_fake = False
-            if save_fake:
-                visuals = OrderedDict([('real_image',
+            visuals = OrderedDict([('real_image',
                                         util.tensor2im(images[0])),
                                        ('fake_image',
                                         util.tensor2im(output_images[0]))])
-                visualizer.display_current_results(visuals, epoch,
+            visualizer.display_current_results(visuals, epoch,
                                                    total_steps)
             ### save latest model
             if (total_steps % opt.save_latest_freq == save_delta):
@@ -160,11 +157,7 @@ def train(gpu, opt):
                    time.time() - epoch_start_time))
 
         ### save model for this epoch
-        if len(opt.gpu_ids) > 1 and opt.local_rank != 0:
-            save_model = False
-        else:
-            save_model = True
-        if (epoch % opt.save_epoch_freq == 0) and save_model:
+        if (epoch % opt.save_epoch_freq == 0):
             print('saving the model at the end of epoch %d, iters %d' % (
                 epoch, total_steps))
             if use_cuda:

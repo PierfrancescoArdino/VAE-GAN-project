@@ -7,6 +7,7 @@ from losses import losses
 from collections import OrderedDict
 import torchvision
 from torchsummary import summary
+from .base_model import BaseModel
 
 def weights_init(m):
     classname = m.__class__.__name__
@@ -229,7 +230,7 @@ class NLayerDiscriminator(nn.Module):
             return self.model(input)
 
 
-class VaeGanModule(nn.Module):
+class VaeGanModule(BaseModel):
 
 
     def init_loss_filter(self):
@@ -313,4 +314,10 @@ class VaeGanModule(nn.Module):
         loss_G_GAN = self.criterionGAN(pred_fake, True)
         
         return [self.loss_filter(loss_G_GAN, kld_loss, reconstruction_loss, loss_D_real, loss_D_fake), fake_image]
+
+    def save(self, which_epoch):
+        self.save_network(self.encoder, 'encoder', which_epoch, self.gpu_ids)
+        self.save_network(self.decoder, 'decoder', which_epoch, self.gpu_ids)
+        self.save_network(self.discriminator, 'discriminator', which_epoch,
+                          self.gpu_ids)
 

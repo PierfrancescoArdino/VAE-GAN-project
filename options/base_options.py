@@ -65,11 +65,10 @@ class BaseOptions():
             torch.cuda.set_device(self.opt.gpu_ids[0])
 
         args = vars(self.opt)
-        if self.opt.local_rank == 0:
-            print('------------ Options -------------')
-            for k, v in sorted(args.items()):
-                print('%s: %s' % (str(k), str(v)))
-            print('-------------- End ----------------')
+        print('------------ Options -------------')
+        for k, v in sorted(args.items()):
+            print('%s: %s' % (str(k), str(v)))
+        print('-------------- End ----------------')
 
         # save to the disk
         folder_name = "DPFIP"
