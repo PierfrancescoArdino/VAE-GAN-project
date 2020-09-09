@@ -7,7 +7,7 @@ from losses import losses
 from collections import OrderedDict
 import torchvision
 from torchsummary import summary
-from .base_model import BaseModel
+from base_model import BaseModel
 
 def weights_init(m):
     classname = m.__class__.__name__
