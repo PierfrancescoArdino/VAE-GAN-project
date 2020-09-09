@@ -229,22 +229,45 @@ class NLayerDiscriminator(nn.Module):
             return self.model(input)
 
 
-class VaeGanModule(pl.LightningModule):
+class VaeGanModule(nn.Module):
 
-    def __init__(self, hparams):
+
+    def init_loss_filter(self):
+        flags = (True, True, True, True, True)
+        def loss_filter(g_gan, g_kl_image, g_image_rec, d_real, d_fake):
+                return [l for (l, f) in
+                        zip((g_gan, g_kl_image, g_image_rec, d_real, d_fake), flags) if f]
+        return loss_filter
+
+
+    def __init__(self, opt, device):
         super().__init__()
-        self.ngf = hparams.ngf
-        self.z_dim = hparams.z_dim
-        self.hparams = hparams
-        self.encoder = Encoder(ngf=self.ngf, z_dim=self.z_dim)
+        self.ngf = opt.ngf
+        self.z_dim = opt.z_dim
+        self.hparams = opt
+        self.encoder = Encoder(ngf=self.ngf, z_dim=self.z_dim).to(device)
         self.encoder.apply(weights_init)
-        self.decoder = Decoder(ngf=self.ngf, z_dim=self.z_dim)
+        self.decoder = Decoder(ngf=self.ngf, z_dim=self.z_dim).to(device)
         self.decoder.apply(weights_init)
-        self.discriminator = Discriminator()
+        self.discriminator = Discriminator().to(device)
         self.discriminator.apply(weights_init)
         self.criterionFeat = torch.nn.L1Loss()
         self.criterionGAN = losses.GANLoss(gan_mode="lsgan")
         self.last_imgs = None
+        self.loss_filter = self.init_loss_filter()
+        params = list(self.encoder.parameters()) + \
+                                  list(self.decoder.parameters())
+        self.optimizer_vae = torch.optim.Adam(params, lr=opt.lr,
+                                            betas=(opt.beta1, opt.beta2))
+        # optimizer D
+        params = list(self.discriminator.parameters())
+
+        self.optimizer_D = torch.optim.Adam(params, lr=opt.lr,
+                                            betas=(opt.beta1, opt.beta2))
+        self.loss_names = \
+            self.loss_filter('G_GAN', "G_KL_image",
+                             "G_Image_Rec",
+                             'D_real', 'D_fake')
 
     def reparameterize(self, mu, logvar, mode):
         if mode == 'train':
@@ -263,88 +286,31 @@ class VaeGanModule(pl.LightningModule):
         return self.discriminator.forward(input_concat_fake), \
                self.discriminator.forward(input_concat_real)
 
-    def training_step(self, batch, batch_idx, optimizer_idx):
-        x, _ = batch
+    def forward(self, images):
+        x, _ = images
         self.last_imgs = x
-        if optimizer_idx == 0:
-            # encode
-            mu, log_var = self.encoder(x)
-            z_repar = self.reparameterize(mu, log_var, mode='train')
-            # decode
-            fake_image = self.decoder(z_repar)
-            # reconstruction
-            reconstruction_loss = self.criterionFeat(fake_image, x)
-            kld_loss = torch.mean(
-                -0.5 * torch.sum(1 + log_var - mu ** 2 - log_var.exp(), dim=1),
-                dim=0)
-            input_concat_fake = \
-                torch.cat((fake_image, x), dim=1)
-            pred_fake = self.discriminator.forward(input_concat_fake)
-            loss_G_GAN = self.criterionGAN(pred_fake, True)
-            g_loss = (reconstruction_loss * 10) + kld_loss + loss_G_GAN
-            result = pl.TrainResult(g_loss)
-            result.log("rec_loss", reconstruction_loss * 10, prog_bar=True)
-            result.log("loss_G_GAN", loss_G_GAN, prog_bar=True)
-            result.log("kld_loss", kld_loss, prog_bar=True)
-
-        # train discriminator
-        if optimizer_idx == 1:
-            # Measure discriminator's ability to classify real from generated samples
-            # encode
-            mu, log_var = self.encoder(x)
-            z_repar = self.reparameterize(mu, log_var, mode="train")
-            # decode
-            fake_image = self.decoder(z_repar)
-            # how well can it label as real?
-            pred_fake, pred_real = self.discriminate(fake_image, x)
-            loss_D_fake = self.criterionGAN.forward(pred_fake, False)
-
-            # Real Loss
-
-            loss_D_real = self.criterionGAN(pred_real, True)
-            loss_D = (loss_D_fake + loss_D_real) * 0.5
-            result = pl.TrainResult(loss_D)
-            result.log("loss_D_real", loss_D_real, prog_bar=True)
-            result.log("loss_D_fake", loss_D_fake, prog_bar=True)
-        
-        return result
-
-    def validation_step(self, batch, batch_idx):
-        x, _ = batch
 
         mu, log_var = self.encoder(x)
-        z_repar = self.reparameterize(mu, log_var, mode='train')
-        recons = self.decoder(z_repar)
-        reconstruction_loss = nn.functional.mse_loss(recons, x)
+        z_repar = self.reparameterize(mu, log_var, mode="train")
+        # decode
+        fake_image = self.decoder(z_repar)
+        # how well can it label as real?
+        pred_fake, pred_real = self.discriminate(fake_image, x)
+        loss_D_fake = self.criterionGAN.forward(pred_fake, False)
 
-        result = pl.EvalResult(checkpoint_on=reconstruction_loss)
-        return result
+        # Real Loss
 
-    testing_step = validation_step
+        loss_D_real = self.criterionGAN(pred_real, True)
 
-    def on_epoch_end(self):
-        z_appr = torch.FloatTensor(16, self.hparams.z_dim).normal_(0, 1)
-        # match gpu device (or keep as cpu)
-        # log sampled images
-        if self.on_gpu:
-            z_appr = z_appr.cuda(self.last_imgs.device.index)
-        sample_imgs = self.decoder(z_appr)
-        grid = torchvision.utils.make_grid(sample_imgs, normalize=True, range=(-1,1))
-        torchvision.utils.save_image(sample_imgs, f"generated_images_{self.current_epoch}.png", normalize=True, range=(-1,1))
-        self.logger.experiment.add_image(f'generated_images', grid,
-                                         self.current_epoch)
+        # reconstruction
+        reconstruction_loss = self.criterionFeat(fake_image, x)
+        kld_loss = torch.mean(
+            -0.5 * torch.sum(1 + log_var - mu ** 2 - log_var.exp(), dim=1),
+            dim=0)
+        input_concat_fake = \
+            torch.cat((fake_image, x), dim=1)
+        pred_fake = self.discriminator.forward(input_concat_fake)
+        loss_G_GAN = self.criterionGAN(pred_fake, True)
+        
+        return [self.loss_filter(loss_G_GAN, kld_loss, reconstruction_loss, loss_D_real, loss_D_fake), fake_image]
 
-    def configure_optimizers(self):
-        params_vae = list(self.encoder.parameters()) + \
-                          list(self.decoder.parameters())
-        opt_vae = torch.optim.Adam(params_vae, lr=1e-3)
-        opt_d = torch.optim.Adam(self.discriminator.parameters(), lr=1e-3)
-        return [opt_vae, opt_d]
-
-    @staticmethod
-    def add_argparse_args(parser):
-
-        parser.add_argument('--ngf', type=int, default=128)
-        parser.add_argument('--z_dim', type=int, default=128)
-
-        return parser

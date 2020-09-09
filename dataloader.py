@@ -1,127 +1,61 @@
-from pytorch_lightning import LightningDataModule
-from torchvision import transforms
-import torchvision
+from torch.utils import data
+from torchvision import transforms as T
+from torchvision.datasets import ImageFolder
+from PIL import Image
 import torch
-from torch.utils.data import DataLoader
+import os
+import random
+import glob
 
-class CelebaDataModule(LightningDataModule):
 
-    name = 'CelebA'
+class CelebA(data.Dataset):
+    """Dataset class for the CelebA dataset."""
 
-    def __init__(
-        self,
-        hparams,
-        *args,
-        **kwargs,
-    ):
-        """
-        Specs:
-            - Each image is (3 x 218 x 178)
-        Transforms::
-            mnist_transforms = transform_lib.Compose([
-                transform_lib.ToTensor()
-            ])
-        Example::
-            from dataloader import CelebADataModule
-            dataset = CelebADataModule('data/')
-            model = StupidModel()
-            Trainer().fit(model, dataset)
-        """
-        super().__init__(*args, **kwargs)
-        self.hparams = hparams
-        self.transforms = self._default_transforms()
+    def __init__(self, image_dir, transform, mode):
+        """Initialize and preprocess the CelebA dataset."""
+        self.image_dir = image_dir
+        self.transform = transform
+        self.mode = mode
+        self.dataset = []
+        self.preprocess()
 
-    def prepare_data(self):
-        """
-        Saves MNIST files to data_dir
-        """
-        # We can use an image folder dataset the way we have it setup.
-        # Create the dataset
-        dataset = torchvision.datasets.ImageFolder(self.hparams.data_dir, transform=self.transforms)
+        self.num_images = len(self.dataset)
 
-        self.train, self.valid, self.test = \
-            torch.utils.data.random_split(dataset, 
-                                          [len(dataset) - self.hparams.val_split - self.hparams.test_split, 
-                                           self.hparams.val_split,
-                                           self.hparams.test_split])
+    def preprocess(self):
+        """Preprocess the CelebA attribute file."""
+        self.dataset = glob.glob(f"{self.image_dir}/*")
 
-        """
-        dataset = torchvision.datasets.CelebA(self.hparams.data_dir,
-                                              split='all',
-                                              target_type=None,
-                                              transform=transforms,
-                                              target_transform=None,
-                                              download=False)
-        """
+        print('Finished preprocessing the CelebA dataset...')
 
-    def train_dataloader(self):
-        """
-        CelebA train set
-        """
-        loader = DataLoader(
-            self.train,
-            batch_size=self.hparams.batch_size,
-            shuffle=True,
-            #transforms=transforms,
-            num_workers=self.hparams.num_workers,
-            drop_last=True,
-            pin_memory=True
-        )
-        return loader
+    def __getitem__(self, index, mode = "train", ):
+        """Return one image."""
+        dataset = self.dataset
+        filename = dataset[index]
+        image = Image.open(filename)
+        return self.transform(image)
 
-    def val_dataloader(self):
-        """
-        CelebA valid set
-        """
-        loader = DataLoader(
-            self.valid,
-            batch_size=self.hparams.batch_size,
-            shuffle=False,
-            num_workers=self.hparams.num_workers,
-            drop_last=False,
-            pin_memory=True
-        )
-        return loader
+    def __len__(self):
+        """Return the number of images."""
+        return self.num_images
 
-    def test_dataloader(self):
-        """
-        CelebA test set
-        """
-        loader = DataLoader(
-            self.test,
-            batch_size=self.hparams.batch_size,
-            shuffle=False,
-            num_workers=self.hparams.num_workers,
-            drop_last=False,
-            pin_memory=True
-        )
-        return loader
 
-    def _default_transforms(self):
-        """
-        Apply recommended transformations for CelebA
-        """
-        res = transforms.Compose([
-            transforms.RandomHorizontalFlip(),
-            transforms.CenterCrop(178),
-            transforms.Resize(64),
-            transforms.ToTensor(),
-            transforms.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5))
-        ])
-        return res
+def get_loader(batch_size, image_dir, crop_size=178,
+               image_size=128,
+               dataset='CelebA', mode='train', num_workers=16):
+    """Build and return a data loader."""
+    transform = []
+    if mode == 'train':
+        transform.append(T.RandomHorizontalFlip())
+    transform.append(T.CenterCrop(crop_size))
+    transform.append(T.Resize(image_size))
+    transform.append(T.ToTensor())
+    transform.append(T.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)))
+    transform = T.Compose(transform)
 
-    @staticmethod
-    def add_dataloader_args(parser):
-        parser.add_argument("--batch_size", type=int, default=32)
+    dataset = CelebA(image_dir, transform, mode)
 
-        parser.add_argument("--dims", type=tuple, nargs="+", default=[1, 28, 28])
-        parser.add_argument("--data_dir", type=str, default="./data")
-
-        parser.add_argument("--val_split", type=int, default=10000)
-        parser.add_argument("--test_split", type=int, default=20000)
-
-        parser.add_argument("--num_workers", type=int, default=16)
-
-        parser.add_argument("--normalize", action="store_true")
-        parser.add_argument("--seed", type=int, default=42)
-        return parser
+    data_loader = data.DataLoader(dataset=dataset,
+                                  batch_size=batch_size,
+                                  shuffle=(mode == 'train'),
+                                  num_workers=num_workers)
+    return data_loader
