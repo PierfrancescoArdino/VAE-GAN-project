@@ -179,28 +179,4 @@ def train(gpu, opt):
 
 if __name__ == "__main__":
     opt = TrainOptions().parse()
-    if opt.phase == "train":
-        if len(opt.gpu_ids) > 1:
-            env_dict = {
-                key: os.environ[key]
-                for key in ("MASTER_ADDR", "MASTER_PORT", "RANK", "WORLD_SIZE")
-            }
-            print(
-                f"[{os.getpid()}] Initializing process group with: {env_dict}")
-            dist.init_process_group(backend="nccl")
-            print(
-                f"[{os.getpid()}] world_size = {dist.get_world_size()}, "
-                + f"rank = {dist.get_rank()}, backend={dist.get_backend()}"
-            )
-            train(None, opt)
-            dist.destroy_process_group()
-        else:
-            train(None, opt)
-    else:
-
-        opt.no_flip = True
-        opt.isTrain = False
-        if opt.model_phase == "SPG-NET":
-            test(opt)
-        else:
-            test_slg(opt)
+    train(None, opt)
