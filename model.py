@@ -242,7 +242,7 @@ class VaeGanModule(BaseModel):
 
 
     def __init__(self, opt, device):
-        super().__init__()
+        super().__init__(opt)
         self.ngf = opt.ngf
         self.z_dim = opt.z_dim
         self.hparams = opt
