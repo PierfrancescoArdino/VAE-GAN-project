@@ -67,7 +67,7 @@ def train(gpu, opt):
     display_delta = total_steps % opt.display_freq
     print_delta = total_steps % opt.print_freq
     save_delta = total_steps % opt.save_latest_freq
-    model = VaeGanModule(opt)
+    model = VaeGanModule(opt, device)
 
     if use_cuda:
         model = model.cuda()
