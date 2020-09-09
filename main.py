@@ -94,7 +94,7 @@ def train(gpu, opt):
                                                 int) and x is not None else x
                 for x in losses]
             if use_cuda:
-                loss_dict = dict(zip(model.module.loss_names, losses))
+                loss_dict = dict(zip(model.loss_names, losses))
             else:
                 loss_dict = dict(zip(model.loss_names, losses))
             # calculate final loss scalar
@@ -143,7 +143,7 @@ def train(gpu, opt):
                     'saving the latest model (epoch %d, total_steps %d)' % (
                         epoch, total_steps))
                 if use_cuda:
-                    model.module.save('latest')
+                    model.save('latest')
                 else:
                     model.save('latest')
                 np.savetxt(iter_path, (epoch, epoch_iter), delimiter=',',
@@ -160,20 +160,13 @@ def train(gpu, opt):
         if (epoch % opt.save_epoch_freq == 0):
             print('saving the model at the end of epoch %d, iters %d' % (
                 epoch, total_steps))
-            if use_cuda:
-                model.module.save('latest')
-                model.module.save(epoch)
-            else:
-                model.save('latest')
-                model.save(epoch)
+            model.save('latest')
+            model.save(epoch)
             np.savetxt(iter_path, (epoch + 1, 0), delimiter=',', fmt='%d')
 
         ### linearly decay learning rate after certain iterations
         if epoch > opt.niter:
-            if use_cuda:
-                model.module.update_learning_rate()
-            else:
-                model.update_learning_rate()
+            model.update_learning_rate()
 
 
 
